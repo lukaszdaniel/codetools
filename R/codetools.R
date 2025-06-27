@@ -91,8 +91,7 @@ makeConstantFolder <- function(...,
                                    if (w$foldable(v, w)) foldCall,
                                call = function(e, w) exitFolder(e, w),
                                exit = function(e, w)
-                                  stop0(paste("not a foldable expression:",
-                                        deparse(e, width.cutoff = 500))),
+                                  stop(paste(gettext("not a foldable expression:", domain = "R-codetools"), deparse(e, width.cutoff = 500))),
                                isLocal = function(v, w) FALSE,
                                foldable = isFoldable,
                                isConstant = isConstantValue,
@@ -103,7 +102,7 @@ makeConstantFolder <- function(...,
 
 exitFolder <- function(e, w) {
     w$exit(e, w)
-    stop0("constant folding cannot continue")
+    stop("constant folding cannot continue")
 }
 constantFold <- function(e, env = NULL, fail = NULL) {
     job <- function(exit) {
@@ -245,7 +244,7 @@ collectLocalsForHandler <- function(e, w) {
 checkSymOrString <- function(e, signal = stop) {
     type <- typeof(e)
     if (type == "symbol" || type == "character") e
-    else signal("not a symbol or string")
+    else signal(gettext("not a symbol or string"))
 }
 collectLocalsLocalHandler <- function(e, w) {
     if (length(e) == 2) # no explicit env
@@ -275,8 +274,7 @@ findLocalsList <- function(elist, envir = .BaseEnv) {
             vals <- ls(env, all.names = TRUE)
             rdsf <- vals %in% specialSyntaxFuns
             if (any(rdsf))
-                warning0(paste("local assignments to syntactic functions:",
-                               vals[rdsf]))
+                warning(paste(gettext("local assignments to syntactic functions:", domain = "R-codetools"), vals[rdsf]))
             return(vals)
         }
     }
@@ -307,19 +305,19 @@ findFuncLocals <- function(formals, body)
 getAssignedVar <- function(e) {
     v <- e[[2]]
     if (missing(v))
-        stop0(paste("bad assignment:", pasteExpr(e)))
+        stop0(paste(gettext("bad assignment:", domain = "R-codetools"), pasteExpr(e)))
     else if (typeof(v) %in% c("symbol", "character"))
         as.character(v)
     else {
         while (typeof(v) == "language") {
             if (length(v) < 2)
-                stop0(paste("bad assignment:", pasteExpr(e)))
+                stop(paste(gettext("bad assignment:", domain = "R-codetools"), pasteExpr(e)))
             v <- v[[2]]
             if (missing(v))
-                stop0(paste("bad assignment:", pasteExpr(e)))
+                stop(paste(gettext("bad assignment:", domain = "R-codetools"), pasteExpr(e)))
         }
         if (typeof(v) != "symbol")
-            stop0(paste("bad assignment:", pasteExpr(e)))
+            stop(paste(gettext("bad assignment:", domain = "R-codetools"), pasteExpr(e)))
         as.character(v)
     }
 }
@@ -359,8 +357,7 @@ makeAssgnFcn <- function(fun) {
             fun
         }
         else
-            stop(sQuote(deparse(fun)),
-                 " is not a valid function in complex assignments")
+            stop(gettextf("%s is not a valid function in complex assignments", sQuote(deparse(fun)), domain = "R-codetools"))
    }
 }
 flattenAssignment <- function(e) {
@@ -413,12 +410,12 @@ collectUsageLeaf  <- function(v, w) {
     if (typeof(v) == "symbol") {
         vn <- as.character(v)
         if (v == "...")
-            w$signal("... may be used in an incorrect context", w)
+            w$signal(gettextf("%s may be used in an incorrect context", sQuote("..."), domain = "R-codetools"), w)
         else if (isDDSym(v)) {
             if (w$isLocal("...", w))
                 w$enterLocal("variable", "...", v, w)
             else
-                w$signal(paste(v, "may be used in an incorrect context"), w)
+                w$signal(gettextf("%s may be used in an incorrect context", sQuote(v), domain = "R-codetools"), w)
         }
         else if (w$isLocal(vn, w))
             w$enterLocal("variable", vn, v, w)
@@ -433,8 +430,7 @@ collectUsageArgs <- function(e, w) {
             if (w$isLocal("...", w))
                 w$enterLocal("variable", "...", a, w)
             else
-                w$signal(paste(a, "may be used in an incorrect context:",
-                               pasteExpr(e)), w)
+                w$signal(gettextf("%s may be used in an incorrect context: %s", sQuote(a), pasteExpr(e), domain = "R-codetools"), w)
         }
         else walkCode(a, w)
 }
@@ -533,11 +529,11 @@ isClosureFunDef <- function(e, w)
 
 checkDotsAssignVar <- function(v, w) {
     if (v == "...") {
-        w$signal("... may be used in an incorrect context", w)
+        w$signal(gettextf("%s may be used in an incorrect context", sQuote("..."), domain = "R-codetools"), w)
         FALSE
     }
     else if (isDDSym(v)) {
-        w$signal(paste(v, "may be used in an incorrect context"), w)
+        w$signal(gettextf("%s may be used in an incorrect context", sQuote(v), domain = "R-codetools"), w)
         FALSE
     }
     else TRUE
@@ -599,7 +595,7 @@ addCollectUsageHandler("for", "base", function(e, w) {
 addCollectUsageHandler("{", "base", function(e, w) {
     w$enterGlobal("function", "{", e, w)
     w$srcfile <- attr(e, "srcfile")$filename
-    
+
     if (length(e)>1){
         for ( i in 2 : length(e)){      
             if ( !is.null(attr(e, "srcref")[[i]])){
@@ -680,19 +676,18 @@ local({
 addCollectUsageHandler(".Internal", "base", function(e, w) {
     w$enterGlobal("function", ".Internal", e, w)
     if (length(e) != 2)
-        w$signal(paste("wrong number of arguments to '.Internal':",
-                       pasteExpr(e)), w)
+        w$signal(paste(gettextf("wrong number of arguments to %s:", sQuote(".Internal()"), domain = "R-codetools"), pasteExpr(e)), w)
     else if (typeof(e[[2]]) == "language") {
         w$enterInternal(e[[2]][[1]], e[[2]], w)
         collectUsageArgs(e[[2]], w)
     }
-    else w$signal(paste("bad argument to '.Internal':", pasteExpr(e[[2]])), w)
+    else w$signal(paste(gettext("bad argument to '.Internal':", domain = "R-codetools"), pasteExpr(e[[2]])), w)
 })
 
 addCollectUsageHandler("substitute", "base", function(e, w) {
     w$enterGlobal("function", "substitute", e, w)
     if (length(e) > 3)
-        w$signal("wrong number of arguments to 'substitute'", w)
+        w$signal(gettextf("wrong number of arguments to %s", sQuote("substitute()"), domain = "R-codetools"), w)
     if (length(e) == 3) {
         a <- e[[3]]
         if (! missing(a)) walkCode(a, w)
@@ -745,8 +740,7 @@ mkLinkHandler <- function(family, okLinks) {
         if (length(e) >= 2) {
             if (is.character(e[[2]])) {
                 if (! (e[[2]] %in% okLinks))
-                    w$signal(paste("link", sQuote(e[[2]]), "not available for",
-                                   sQuote(family)), w)
+                    w$signal(gettextf("link %s not available for %s", sQuote(e[[2]]), sQuote(family), domain = "R-codetools"), w)
             }
             else if (! is.name(e[[2]]) || ! as.character(e[[2]]) %in% okLinks)
                 walkCode(e[[2]], w)
@@ -921,24 +915,19 @@ checkUsageFinishLocals <- function(w) {
 
             if (parameter) {
                 if (! suppressVar(v, w$suppressParamAssigns) && assigns > 0)
-                    w$signal(paste("parameter", sQuote(v),
-                                   "changed by assignment"), w)
+                    w$signal(gettextf("parameter %s changed by assignment", sQuote(v), domain = "R-codetools"), w)
                 else if (! suppressVar(v, w$suppressParamUnused) &&
                          uses == 0 && v != "...")
-                    w$signal(paste("parameter", sQuote(v), "may not be used"),
-                             w)
+                    w$signal(gettextf("parameter %s may not be used", sQuote(v), domain = "R-codetools"), w)
             }
             else {
                 if (uses == 0) {
                     if (! suppressVar(v, w$suppressLocalUnused))
-                        w$signal(paste("local variable", sQuote(v),
-                                       "assigned but may not be used"), w)
+                        w$signal(gettextf("local variable %s assigned but may not be used", sQuote(v), domain = "R-codetools"), w)
                 }
                 else if (funuses > 0 && is.null(funforms)) {
                     if (! suppressVar(v, w$suppressNoLocalFun))
-                        w$signal(paste("local variable", sQuote(v),
-                                       "used as function with no apparent",
-                                       "local function definition"), w)
+                        w$signal(gettextf("local variable %s used as function with no apparent local function definition", sQuote(v), domain = "R-codetools"), w)
                 }
             }
             if (! suppressVar(v, w$suppressFundefMismatch) &&
@@ -948,9 +937,7 @@ checkUsageFinishLocals <- function(w) {
                 for (d in funforms[-1])
                     if (! identical(first, d) ||
                         ! identical(nfirst, names(d))) {
-                        w$signal(paste("multiple local function",
-                                       "definitions for", sQuote(v),
-                                       "with different formal arguments"), w)
+                        w$signal(gettextf("multiple local function definitions for %s with different formal arguments", sQuote(v), domain = "R-codetools"), w)
                         break
                     }
             }
@@ -973,18 +960,15 @@ checkUsageEnterGlobal <- function(type, n, e, w) {
             }
         }
         else if (! suppressVar(n, w$suppressUndefined))
-            w$signal(paste("no visible global function definition for",
-                           sQuote(n)), w)
+            w$signal(gettextf("no visible global function definition for %s", sQuote(n), domain = "R-codetools"), w)
     }
     else if (type == "variable") {
         if (! exists(n, w$globalenv) && ! suppressVar(n, w$suppressUndefined))
-            w$signal(paste("no visible binding for global variable",
-                           sQuote(n)), w)
+            w$signal(gettextf("no visible binding for global variable %s", sQuote(n), domain = "R-codetools"), w)
     }
     else if (type == "<<-") {
         if (! exists(n, w$globalenv))
-            w$signal(paste("no visible binding for '<<-' assignment to",
-                           sQuote(n)), w)
+            w$signal(gettextf("no visible binding for '<<-' assignment to %s", sQuote(n), domain = "R-codetools"), w)
     }
 }
 
@@ -1028,7 +1012,7 @@ checkUsage <- function(fun, name = "<anonymous>",
                           suppressUndefined = suppressUndefined,
                           suppressPartialMatchArgs = suppressPartialMatchArgs),
              error = function(e) {
-                         report(paste0(name, ": Error while checking: ",
+                         report(paste0(name, ": ", gettextf("Error while checking: ", domain = "R-codetools"),
                                        conditionMessage(e), "\n"))
                      })
     invisible(NULL)         
@@ -1066,8 +1050,7 @@ noMissingAllowed <- c("c")
 checkPrimopCall <- function(fn, e, isBuiltin, signal = warning0) {
     if (anyMissing(e[-1])) {
         if (isBuiltin || fn %in% noMissingAllowed)
-            signal(paste("missing arguments not allowed in calls to",
-                         sQuote(fn)))
+            signal(gettextf("missing arguments not allowed in calls to %s", sQuote(fn), domain = "R-codetools"))
     }                   
     if (exists(".GenericArgsEnv") && exists(fn, get(".GenericArgsEnv"))) {
         def <- get(fn, envir = get(".GenericArgsEnv"))
@@ -1080,7 +1063,7 @@ checkPrimopCall <- function(fn, e, isBuiltin, signal = warning0) {
     else if (exists(fn, envir = primopArgCounts, inherits = FALSE)) {
         argc <- get(fn, envir = primopArgCounts)
         if (! any(argc == (length(e) - 1))) {
-            signal(paste("wrong number of arguments to", sQuote(fn)))
+            signal(gettextf("wrong number of arguments to %s", sQuote(fn), domain = "R-codetools"))
             FALSE
         }
         else TRUE
@@ -1152,16 +1135,13 @@ checkCall <- function(def, call, signal = warning0) {
         withCallingHandlers(matchCall(def, call),
             warning = function(w) {
                 msg <- conditionMessage(w)
-                signal(paste("warning in ",
-                             deparse(call, width.cutoff = 500),
-                             ": ", msg, sep=""))
+                signal(paste(gettextf("warning in %s: ", sQuote(deparse(call, width.cutoff = 500)), domain = "R-codetools"), msg, sep=""))
                 invokeRestart("muffleWarning")
             })
     msg <- tryCatch({testMatch(); NULL},
                     error = function(e) conditionMessage(e))
     if (! is.null(msg)) {
-        emsg <- paste("possible error in ", deparse(call, width.cutoff = 500),
-                      ": ", msg, sep="")
+        emsg <- paste(gettextf("possible error in %s: ", sQuote(deparse(call, width.cutoff = 500)), domain = "R-codetools"), msg, sep = "")
         if (! is.null(signal)) signal(emsg)
         FALSE
     }
